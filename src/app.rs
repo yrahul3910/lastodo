@@ -87,14 +87,14 @@ impl App {
             description: "This is another task".to_string(),
             due: chrono::Local::now(),
         };
-        task_list.insert(KanbanStatus::Todo, vec![task1]);
+        task_list.insert(KanbanStatus::Todo, vec![task1.clone()]);
         task_list.insert(KanbanStatus::Partial, vec![task2]);
         task_list.insert(KanbanStatus::Doing, Vec::new());
         task_list.insert(KanbanStatus::Done, Vec::new());
         task_list.insert(KanbanStatus::Blocked, Vec::new());
 
         App {
-            cur_task: None,
+            cur_task: Some(task1),
             task_list,
             current_screen: CurrentScreen::Main,
             currently_editing_list: None,

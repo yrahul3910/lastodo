@@ -2,11 +2,10 @@ use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::prelude::Rect;
 use ratatui::style::*;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
+use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
 use ratatui::Frame;
 
 use crate::app::CurrentScreen;
-use crate::app::KanbanStatus;
 use crate::App;
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
@@ -60,9 +59,18 @@ impl App {
             .constraints(&constraints)
             .split(chunks[1]);
 
+        let active_style = Style::default().bg(Color::LightYellow).fg(Color::Black);
+
         for (i, (status, tasks)) in self.task_list.iter().enumerate() {
             let rows = tasks.iter().map(|task| {
+                let style = if self.cur_task.is_none() || self.cur_task.as_ref().unwrap() == task {
+                    active_style
+                } else {
+                    Style::default()
+                };
+
                 Row::new(vec![task.title.clone()])
+                    .style(style)
             });
 
             let table = Table::new(rows, &constraints)
