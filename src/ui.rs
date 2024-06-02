@@ -63,7 +63,8 @@ impl App {
 
         for (i, (status, tasks)) in self.task_list.iter().enumerate() {
             let rows = tasks.iter().map(|task| {
-                let style = if self.cur_task.is_none() || self.cur_task.as_ref().unwrap() == task {
+                let cur_task = self.get_cur_task();
+                let style = if cur_task.is_none() || cur_task.as_ref().unwrap() == task {
                     active_style
                 } else {
                     Style::default()
@@ -84,19 +85,17 @@ impl App {
             frame.render_widget(table, table_chunks[i]);
         }
 
-
-        let cur_nav_text = vec![
-            match self.current_screen {
-                CurrentScreen::Main => Span::styled("Main", Style::default().fg(Color::Green)),
-                CurrentScreen::Editing => {
-                    Span::styled("Editing Task", Style::default().fg(Color::Yellow))
-                }
-                CurrentScreen::Exiting => Span::styled("Exiting", Style::default().fg(Color::Red)),
+        let cur_nav_text = {
+            if let Some(cur_task) = self.get_cur_task() {
+                format!(
+                    "{} | Due: {}",
+                    cur_task.title,
+                    cur_task.due.format("%Y-%m-%d")
+                )
+            } else {
+                "No task selected.".to_string()
             }
-            .to_owned(),
-            // Divider
-            Span::styled(" | ", Style::default().fg(Color::White)),
-        ];
+        };
         let mode_footer =
             Paragraph::new(Line::from(cur_nav_text)).block(Block::default().borders(Borders::ALL));
 
