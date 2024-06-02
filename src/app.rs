@@ -3,7 +3,6 @@ use std::hash::Hash;
 use chrono::DateTime;
 use color_eyre::{eyre::WrapErr, Result};
 use crossterm::event;
-use ratatui::Frame;
 use crossterm::event::{KeyCode, KeyEventKind};
 use indexmap::IndexMap;
 
@@ -27,11 +26,23 @@ pub enum KanbanStatus {
     Blocked,
 }
 
+impl std::fmt::Display for KanbanStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            KanbanStatus::Todo => write!(f, "Todo"),
+            KanbanStatus::Partial => write!(f, "Partial"),
+            KanbanStatus::Doing => write!(f, "Doing"),
+            KanbanStatus::Done => write!(f, "Done"),
+            KanbanStatus::Blocked => write!(f, "Blocked"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum TaskField {
     Title,
     Description,
-    Due
+    Due,
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
@@ -52,26 +63,38 @@ pub struct TaskEditState {
 
 #[derive(Debug, Default)]
 pub struct App {
-    pub cur_task: Task,
-    pub task_list: IndexMap<KanbanStatus, Vec<Task>>,
-    pub current_screen: CurrentScreen,
-    pub currently_editing_list: Option<KanbanStatus>,
-    pub currently_editing_task: Option<TaskEditState>,
-    pub message: String,
-    pub exit: bool,
+    pub cur_task: Option<Task>, // The currently highlighted task
+    pub task_list: IndexMap<KanbanStatus, Vec<Task>>, // The list of tasks
+    pub current_screen: CurrentScreen, // The current screen
+    pub currently_editing_list: Option<KanbanStatus>, // The list currently being edited
+    pub currently_editing_task: Option<TaskEditState>, // The task currently being edited
+    pub message: String,        // Status message
+    pub exit: bool,             // Whether to exit the application
 }
 
 impl App {
     pub fn new() -> App {
         let mut task_list = IndexMap::new();
-        task_list.insert(KanbanStatus::Todo, Vec::new());
-        task_list.insert(KanbanStatus::Partial, Vec::new());
+        let task1 = Task {
+            title: "Task 1".to_string(),
+            kanban_status: KanbanStatus::Todo,
+            description: "This is a task".to_string(),
+            due: chrono::Local::now(),
+        };
+        let task2 = Task {
+            title: "Task 2".to_string(),
+            kanban_status: KanbanStatus::Partial,
+            description: "This is another task".to_string(),
+            due: chrono::Local::now(),
+        };
+        task_list.insert(KanbanStatus::Todo, vec![task1]);
+        task_list.insert(KanbanStatus::Partial, vec![task2]);
         task_list.insert(KanbanStatus::Doing, Vec::new());
         task_list.insert(KanbanStatus::Done, Vec::new());
         task_list.insert(KanbanStatus::Blocked, Vec::new());
 
         App {
-            cur_task: Task::default(),
+            cur_task: None,
             task_list,
             current_screen: CurrentScreen::Main,
             currently_editing_list: None,
@@ -91,53 +114,38 @@ impl App {
     }
 
     pub fn save_task(&mut self) -> std::result::Result<(), String> {
-        let status = &self.cur_task.kanban_status;
+        if self.cur_task.is_none() {
+            return Err(String::from("No task was selected."));
+        }
+
+        let status = &self.cur_task.as_ref().unwrap().kanban_status;
 
         if self.currently_editing_task.is_none() {
             return Err(String::from("No task is currently being edited."));
         }
 
-        // If we're editing an existing task, update it. Otherwise, add a new one.
-        if self.currently_editing_task.is_some() {
-            self.task_list
-                .entry(status.clone())
-                .or_insert_with(Vec::new)
-                .push(self.cur_task.clone());
-        } else {
-            let task_list = self
-                .task_list
-                .entry(status.clone())
-                .or_insert_with(Vec::new);
-            let index = task_list
-                .iter()
-                .position(|task| task == &self.cur_task)
-                .unwrap();
-            task_list[index] = self.cur_task.clone();
-        }
+        let cur_task = self.cur_task.as_ref().unwrap();
+
+        let task_list = self
+            .task_list
+            .entry(status.clone())
+            .or_insert_with(Vec::new);
+        let index = task_list.iter().position(|task| task == cur_task).unwrap();
+        task_list[index] = self.cur_task.clone().unwrap();
 
         Ok(())
-    }
-
-    fn render(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.size());
     }
 
     fn handle_events(&mut self) -> std::io::Result<()> {
         match event::read()? {
             event::Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match self.current_screen {
-                    CurrentScreen::Exiting => match key_event.code {
-                        KeyCode::Char('y') => {
-                            self.exit = true;
-                        }
-                        KeyCode::Char('n') => {
-                            self.current_screen = CurrentScreen::Main;
-                        }
-                        _ => {}
-                    },
+                    CurrentScreen::Exiting => {
+                        self.exit = true;
+                    }
                     CurrentScreen::Editing => match key_event.code {
                         KeyCode::Char('w') => {
-                            self.save_task();
+                            let _ = self.save_task();
                         }
                         KeyCode::Char('q') | KeyCode::Esc => {
                             if let Some(cur_task) = &self.currently_editing_task {
@@ -158,15 +166,17 @@ impl App {
                         // Handle editing case
                         KeyCode::Char(val) => {
                             if let Some(field) = &self.currently_editing_task.as_mut() {
+                                let cur_task = self.cur_task.as_mut().unwrap();
+
                                 match field.currently_editing {
                                     Some(TaskField::Title) => {
-                                        self.cur_task.title.push(val);
+                                        cur_task.title.push(val);
                                     }
                                     Some(TaskField::Description) => {
-                                        self.cur_task.description.push(val);
+                                        cur_task.description.push(val);
                                     }
                                     Some(TaskField::Due) => {
-                                        self.cur_task.due = chrono::Local::now();
+                                        cur_task.due = chrono::Local::now();
                                     }
                                     _ => {}
                                 }
@@ -177,7 +187,7 @@ impl App {
                     },
                     CurrentScreen::Main => match key_event.code {
                         KeyCode::Char('q') => {
-                            self.current_screen = CurrentScreen::Exiting;
+                            self.exit = true;
                         }
                         KeyCode::Char('w') => {}
                         KeyCode::Char('i') => {
@@ -194,4 +204,3 @@ impl App {
         Ok(())
     }
 }
-

@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::panic;
 
 use color_eyre::{config::HookBuilder, eyre};
@@ -19,7 +20,7 @@ pub fn install_hooks() -> color_eyre::Result<()> {
     // convert from a color_eyre EyreHook to a eyre ErrorHook
     let eyre_hook = eyre_hook.into_eyre_hook();
     eyre::set_hook(Box::new(
-        move |error: &(dyn std::error::Error + 'static)| {
+        move |error: &(dyn Error + 'static)| {
             tui::restore().unwrap();
             eyre_hook(error)
         },
