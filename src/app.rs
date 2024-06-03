@@ -13,8 +13,7 @@ use std::cmp;
 pub enum CurrentScreen {
     #[default]
     Main,
-    Editing,
-    Exiting,
+    Editing
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -138,15 +137,13 @@ impl App {
     }
 
     pub fn get_cur_task(&self) -> Option<Task> {
-        if self.cur_task.is_none() {
-            return None;
-        }
+        self.cur_task.as_ref()?;
 
         let cur_task_status = self.cur_task.as_ref().unwrap().status.clone();
         let cur_task_index = self.cur_task.as_ref().unwrap().index as usize;
         let cur_task = self.task_list[&cur_task_status][cur_task_index].clone();
 
-        return Some(cur_task);
+        Some(cur_task)
     }
 
     pub fn run(&mut self, terminal: &mut Tui) -> Result<()> {
@@ -173,7 +170,7 @@ impl App {
         let task_list = self
             .task_list
             .entry(status.clone())
-            .or_insert_with(Vec::new);
+            .or_default();
         let index = task_list.iter().position(|task| *task == cur_task).unwrap();
 
         task_list[index] = cur_task;
@@ -185,9 +182,6 @@ impl App {
         match event::read()? {
             event::Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match self.current_screen {
-                    CurrentScreen::Exiting => {
-                        self.exit = true;
-                    }
                     CurrentScreen::Editing => match key_event.code {
                         KeyCode::Char('w') => {
                             let _ = self.save_task();
@@ -276,6 +270,46 @@ impl App {
                                 );
 
                                 if new_idx == -1 {
+                                    return Ok(());
+                                }
+
+                                self.cur_task = Some(CurrentTask {
+                                    status: new_status,
+                                    index: new_idx,
+                                });
+                            }
+                        }
+                        KeyCode::Char('j') => {
+                            /* Yes, I know j moves down in vim. I prefer it the other way around.
+                            * It's my app, my rules. (But I'll probably make this configurable) */
+                            if let Some(cur_task) = &self.cur_task {
+                                let cur_task_status = cur_task.status.clone();
+                                let cur_task_index = cur_task.index;
+                                let num_tasks = self.task_list[&cur_task_status].len() as i16;
+
+                                let new_idx = (cur_task_index - 1) % num_tasks;
+                                let new_status = cur_task_status;
+
+                                if new_idx >= self.task_list[&new_status].len() as i16 {
+                                    return Ok(());
+                                }
+
+                                self.cur_task = Some(CurrentTask {
+                                    status: new_status,
+                                    index: new_idx,
+                                });
+                            }
+                        }
+                        KeyCode::Char('k') => {
+                            if let Some(cur_task) = &self.cur_task {
+                                let cur_task_status = cur_task.status.clone();
+                                let cur_task_index = cur_task.index;
+                                let num_tasks = self.task_list[&cur_task_status].len() as i16;
+
+                                let new_idx = (cur_task_index + 1) % num_tasks;
+                                let new_status = cur_task_status;
+
+                                if new_idx >= self.task_list[&new_status].len() as i16 {
                                     return Ok(());
                                 }
 

@@ -6,7 +6,7 @@ use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
 use ratatui::Frame;
 
 use crate::app::CurrentScreen;
-use crate::App;
+use crate::app::App;
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -76,7 +76,7 @@ impl App {
 
             let table = Table::new(rows, &constraints)
                 .block(Block::default().borders(Borders::ALL).title(status.to_string()))
-                .widths(&[
+                .widths([
                     Constraint::Percentage(40),
                     Constraint::Percentage(40),
                     Constraint::Percentage(20),
@@ -116,8 +116,7 @@ impl App {
                     Span::styled("(s)ave", Style::default().fg(Color::White)),
                     Span::styled(" | ", Style::default().fg(Color::White)),
                     Span::styled("(c)ancel", Style::default().fg(Color::White)),
-                ],
-                CurrentScreen::Exiting => vec![],
+                ]
             }
         };
         let key_hints_footer =

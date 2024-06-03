@@ -2,6 +2,7 @@ mod ui;
 mod errors;
 mod tui;
 mod app;
+mod tests;
 
 use std::io::Result;
 use app::App;
