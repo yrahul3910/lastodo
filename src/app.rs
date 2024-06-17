@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use crate::tui::Tui;
 use std::cmp;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub enum CurrentScreen {
     #[default]
     Main,
@@ -60,7 +60,7 @@ impl std::fmt::Display for KanbanStatus {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TaskField {
     Title,
     Description,
@@ -81,7 +81,7 @@ pub struct CurrentTask {
     pub index: i16,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TaskEditState {
     pub currently_editing: Option<TaskField>,
     pub cur_value: String,

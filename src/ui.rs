@@ -5,8 +5,10 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
 use ratatui::Frame;
 
-use crate::app::CurrentScreen;
 use crate::app::App;
+use crate::app::CurrentScreen;
+use crate::app::TaskEditState;
+use crate::app::TaskField;
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -32,7 +34,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 impl App {
-    pub fn render(&self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         // Overall layout. A header with a title, the main area, and a status bar
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -129,5 +131,59 @@ impl App {
 
         frame.render_widget(mode_footer, footer_chunks[0]);
         frame.render_widget(key_hints_footer, footer_chunks[1]);
+
+        if self.current_screen == CurrentScreen::Editing {
+            let title = if self.currently_editing_task.is_some() {
+                "Editing Task"
+            } else {
+                "New task"
+            };
+
+            let editing_block = Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .style(Style::default().bg(Color::Gray));
+
+            let area = centered_rect(60, 25, frame.size());
+
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(1)
+                .constraints([
+                    Constraint::Length(3),
+                    Constraint::Percentage(50),
+                    Constraint::Length(3),
+                ])
+                .split(area);
+
+            let title_block = Block::default().title("Title").borders(Borders::ALL).style(active_style);
+            let desc_block = Block::default().title("Description").borders(Borders::ALL);
+            let due_block = Block::default().title("Due").borders(Borders::ALL);
+
+            let new_state = TaskEditState {
+                currently_editing: Some(TaskField::Title),
+                cur_value: String::new(),
+                is_new_task: true,
+                has_changed: true,
+            };
+            let state = self.currently_editing_task.as_ref().unwrap_or(&new_state);
+
+            let cur_task = self.get_cur_task().unwrap();
+            let title_text = Paragraph::new(cur_task.title)
+                .block(title_block);
+            frame.render_widget(title_text, chunks[0]);
+
+            let desc_text = Paragraph::new(cur_task.description)
+                .block(desc_block);
+            frame.render_widget(desc_text, chunks[1]);
+
+            let due_text = Paragraph::new(cur_task.due.to_string())
+                .block(due_block);
+            frame.render_widget(due_text, chunks[2]);
+
+            frame.render_widget(editing_block, area);
+
+            self.currently_editing_task = Some(state.clone());
+        }
     }
 }
