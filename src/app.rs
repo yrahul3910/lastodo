@@ -13,7 +13,7 @@ use std::cmp;
 pub enum CurrentScreen {
     #[default]
     Main,
-    Editing
+    Editing,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -82,11 +82,18 @@ pub struct CurrentTask {
 }
 
 #[derive(Clone, Debug)]
+pub enum TaskEditMode {
+    Normal,
+    Insert,
+}
+
+#[derive(Clone, Debug)]
 pub struct TaskEditState {
     pub currently_editing: Option<TaskField>,
     pub cur_value: String,
     pub is_new_task: bool,
     pub has_changed: bool,
+    pub mode: TaskEditMode,
 }
 
 #[derive(Debug, Default)]
@@ -94,7 +101,6 @@ pub struct App {
     pub cur_task: Option<CurrentTask>, // The currently highlighted task
     pub task_list: IndexMap<KanbanStatus, Vec<Task>>, // The list of tasks
     pub current_screen: CurrentScreen, // The current screen
-    pub currently_editing_list: Option<KanbanStatus>, // The list currently being edited
     pub currently_editing_task: Option<TaskEditState>, // The task currently being edited
     pub message: String,               // Status message
     pub exit: bool,                    // Whether to exit the application
@@ -129,7 +135,6 @@ impl App {
             cur_task: Some(cur_task),
             task_list,
             current_screen: CurrentScreen::Main,
-            currently_editing_list: None,
             currently_editing_task: None,
             message: String::new(),
             exit: false,
@@ -167,10 +172,7 @@ impl App {
         }
 
         let cur_task = self.get_cur_task().unwrap();
-        let task_list = self
-            .task_list
-            .entry(status.clone())
-            .or_default();
+        let task_list = self.task_list.entry(status.clone()).or_default();
         let index = task_list.iter().position(|task| *task == cur_task).unwrap();
 
         task_list[index] = cur_task;
@@ -182,56 +184,70 @@ impl App {
         match event::read()? {
             event::Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match self.current_screen {
-                    CurrentScreen::Editing => match key_event.code {
-                        KeyCode::Char('w') => {
-                            let _ = self.save_task();
-                        }
-                        KeyCode::Char('q') | KeyCode::Esc => {
-                            if let Some(cur_task) = &self.currently_editing_task {
-                                if cur_task.has_changed {
-                                    self.message =
+                    CurrentScreen::Editing => {
+                        match self.currently_editing_task.as_ref().unwrap().mode {
+                            TaskEditMode::Normal => match key_event.code {
+                                KeyCode::Char('i') => {
+                                    self.currently_editing_task.as_mut().unwrap().mode =
+                                        TaskEditMode::Insert;
+                                }
+                                KeyCode::Char('w') => {
+                                    let _ = self.save_task();
+                                }
+                                KeyCode::Char('q') => {
+                                    if let Some(cur_task) = &self.currently_editing_task {
+                                        if cur_task.has_changed {
+                                            self.message =
                                     "You have unsaved changes. Use 'w' to save or 'x' to discard."
                                         .to_string();
-                                } else {
+                                        } else {
+                                            self.current_screen = CurrentScreen::Main;
+                                        }
+                                    } else {
+                                        self.current_screen = CurrentScreen::Main;
+                                    }
+                                }
+                                KeyCode::Char('x') => {
                                     self.current_screen = CurrentScreen::Main;
                                 }
-                            } else {
-                                self.current_screen = CurrentScreen::Main;
-                            }
-                        }
-                        KeyCode::Char('x') => {
-                            self.current_screen = CurrentScreen::Main;
-                        }
-                        // Handle editing case
-                        KeyCode::Char(val) => {
-                            if let Some(field) = &self.currently_editing_task.as_mut() {
-                                let cur_task_status =
-                                    self.cur_task.as_ref().unwrap().status.clone();
-                                let cur_task_index = self.cur_task.as_ref().unwrap().index as usize;
-
-                                match field.currently_editing {
-                                    Some(TaskField::Title) => {
-                                        self.task_list[&cur_task_status][cur_task_index]
-                                            .title
-                                            .push(val);
-                                    }
-                                    Some(TaskField::Description) => {
-                                        self.task_list[&cur_task_status][cur_task_index]
-                                            .description
-                                            .push(val);
-                                    }
-                                    Some(TaskField::Due) => {
-                                        // TODO: Fix later
-                                        self.task_list[&cur_task_status][cur_task_index].due =
-                                            chrono::Local::now();
-                                    }
-                                    _ => {}
+                                _ => {}
+                            },
+                            TaskEditMode::Insert => match key_event.code {
+                                KeyCode::Esc => {
+                                    self.currently_editing_task.as_mut().unwrap().mode =
+                                        TaskEditMode::Normal;
                                 }
-                            }
+                                KeyCode::Char(val) => {
+                                    if let Some(field) = &self.currently_editing_task.as_mut() {
+                                        let cur_task_status =
+                                            self.cur_task.as_ref().unwrap().status.clone();
+                                        let cur_task_index =
+                                            self.cur_task.as_ref().unwrap().index as usize;
+
+                                        match field.currently_editing {
+                                            Some(TaskField::Title) => {
+                                                self.task_list[&cur_task_status][cur_task_index]
+                                                    .title
+                                                    .push(val);
+                                            }
+                                            Some(TaskField::Description) => {
+                                                self.task_list[&cur_task_status][cur_task_index]
+                                                    .description
+                                                    .push(val);
+                                            }
+                                            Some(TaskField::Due) => {
+                                                // TODO: Fix later
+                                                self.task_list[&cur_task_status][cur_task_index]
+                                                    .due = chrono::Local::now();
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            },
                         }
-                        // TODO: Other keys, such as moving across fields.
-                        _ => {}
-                    },
+                    }
                     CurrentScreen::Main => match key_event.code {
                         KeyCode::Char('q') => {
                             self.exit = true;
@@ -281,7 +297,7 @@ impl App {
                         }
                         KeyCode::Char('j') => {
                             /* Yes, I know j moves down in vim. I prefer it the other way around.
-                            * It's my app, my rules. (But I'll probably make this configurable) */
+                             * It's my app, my rules. (But I'll probably make this configurable) */
                             if let Some(cur_task) = &self.cur_task {
                                 let cur_task_status = cur_task.status.clone();
                                 let cur_task_index = cur_task.index;
@@ -322,7 +338,24 @@ impl App {
                         KeyCode::Char('i') => {
                             self.current_screen = CurrentScreen::Editing;
 
-                            // TODO: Check if we are highlighting a task
+                            self.currently_editing_task =
+                                if let Some(cur_task) = self.get_cur_task() {
+                                    Some(TaskEditState {
+                                        currently_editing: Some(TaskField::Title),
+                                        cur_value: cur_task.title,
+                                        is_new_task: false,
+                                        has_changed: false,
+                                        mode: TaskEditMode::Normal,
+                                    })
+                                } else {
+                                    Some(TaskEditState {
+                                        currently_editing: Some(TaskField::Title),
+                                        cur_value: String::new(),
+                                        is_new_task: true,
+                                        has_changed: false,
+                                        mode: TaskEditMode::Normal,
+                                    })
+                                }
                         }
                         _ => {}
                     },

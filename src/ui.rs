@@ -5,10 +5,13 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
 use ratatui::Frame;
 
-use crate::app::App;
-use crate::app::CurrentScreen;
-use crate::app::TaskEditState;
-use crate::app::TaskField;
+use crate::app::{
+    App,
+    CurrentScreen,
+    TaskEditMode,
+    TaskEditState,
+    TaskField
+};
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -165,6 +168,7 @@ impl App {
                 cur_value: String::new(),
                 is_new_task: true,
                 has_changed: true,
+                mode: TaskEditMode::Normal
             };
             let state = self.currently_editing_task.as_ref().unwrap_or(&new_state);
 
