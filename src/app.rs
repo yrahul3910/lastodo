@@ -180,79 +180,91 @@ impl App {
         Ok(())
     }
 
-    fn handle_events(&mut self) -> std::io::Result<()> {
+    fn handle_normal_mode(&mut self, key_code: KeyCode) {
+        match key_code {
+            KeyCode::Char('i') => {
+                self.currently_editing_task.as_mut().unwrap().mode = TaskEditMode::Insert;
+            }
+            KeyCode::Char('w') => {
+                let _ = self.save_task();
+            }
+            KeyCode::Char('q') => {
+                if let Some(cur_task) = &self.currently_editing_task {
+                    if cur_task.has_changed {
+                        self.message =
+                            "You have unsaved changes. Use 'w' to save or 'x' to discard."
+                                .to_string();
+                    } else {
+                        self.current_screen = CurrentScreen::Main;
+                    }
+                } else {
+                    self.current_screen = CurrentScreen::Main;
+                }
+            }
+            KeyCode::Char('x') => {
+                self.current_screen = CurrentScreen::Main;
+            }
+            KeyCode::Tab => {
+                // TODO: Go to the next field
+            }
+            KeyCode::BackTab => {
+                // TODO: Go to the previous field
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_insert_mode(&mut self, key_code: KeyCode) {
+        match key_code {
+            KeyCode::Esc => {
+                self.currently_editing_task.as_mut().unwrap().mode = TaskEditMode::Normal;
+            }
+            KeyCode::Char(val) => {
+                if let Some(field) = &self.currently_editing_task.as_mut() {
+                    let cur_task_status = self.cur_task.as_ref().unwrap().status.clone();
+                    let cur_task_index = self.cur_task.as_ref().unwrap().index as usize;
+
+                    match field.currently_editing {
+                        Some(TaskField::Title) => {
+                            self.task_list[&cur_task_status][cur_task_index]
+                                .title
+                                .push(val);
+                        }
+                        Some(TaskField::Description) => {
+                            self.task_list[&cur_task_status][cur_task_index]
+                                .description
+                                .push(val);
+                        }
+                        Some(TaskField::Due) => {
+                            // TODO: Fix later
+                            self.task_list[&cur_task_status][cur_task_index].due =
+                                chrono::Local::now();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+   fn handle_events(&mut self) -> std::io::Result<()> {
         match event::read()? {
             event::Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match self.current_screen {
                     CurrentScreen::Editing => {
                         match self.currently_editing_task.as_ref().unwrap().mode {
-                            TaskEditMode::Normal => match key_event.code {
-                                KeyCode::Char('i') => {
-                                    self.currently_editing_task.as_mut().unwrap().mode =
-                                        TaskEditMode::Insert;
-                                }
-                                KeyCode::Char('w') => {
-                                    let _ = self.save_task();
-                                }
-                                KeyCode::Char('q') => {
-                                    if let Some(cur_task) = &self.currently_editing_task {
-                                        if cur_task.has_changed {
-                                            self.message =
-                                    "You have unsaved changes. Use 'w' to save or 'x' to discard."
-                                        .to_string();
-                                        } else {
-                                            self.current_screen = CurrentScreen::Main;
-                                        }
-                                    } else {
-                                        self.current_screen = CurrentScreen::Main;
-                                    }
-                                }
-                                KeyCode::Char('x') => {
-                                    self.current_screen = CurrentScreen::Main;
-                                }
-                                _ => {}
-                            },
-                            TaskEditMode::Insert => match key_event.code {
-                                KeyCode::Esc => {
-                                    self.currently_editing_task.as_mut().unwrap().mode =
-                                        TaskEditMode::Normal;
-                                }
-                                KeyCode::Char(val) => {
-                                    if let Some(field) = &self.currently_editing_task.as_mut() {
-                                        let cur_task_status =
-                                            self.cur_task.as_ref().unwrap().status.clone();
-                                        let cur_task_index =
-                                            self.cur_task.as_ref().unwrap().index as usize;
-
-                                        match field.currently_editing {
-                                            Some(TaskField::Title) => {
-                                                self.task_list[&cur_task_status][cur_task_index]
-                                                    .title
-                                                    .push(val);
-                                            }
-                                            Some(TaskField::Description) => {
-                                                self.task_list[&cur_task_status][cur_task_index]
-                                                    .description
-                                                    .push(val);
-                                            }
-                                            Some(TaskField::Due) => {
-                                                // TODO: Fix later
-                                                self.task_list[&cur_task_status][cur_task_index]
-                                                    .due = chrono::Local::now();
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                }
-                                _ => {}
-                            },
+                            TaskEditMode::Normal => self.handle_normal_mode(key_event.code),
+                            TaskEditMode::Insert => self.handle_insert_mode(key_event.code),
                         }
                     }
                     CurrentScreen::Main => match key_event.code {
                         KeyCode::Char('q') => {
                             self.exit = true;
                         }
-                        KeyCode::Char('w') => {}
+                        KeyCode::Char('w') => {
+                            // TODO: Save all
+                        }
                         KeyCode::Char('h') => {
                             if let Some(cur_task) = &self.cur_task {
                                 let cur_task_status = cur_task.status.clone();
