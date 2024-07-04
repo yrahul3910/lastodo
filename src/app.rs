@@ -60,7 +60,7 @@ impl std::fmt::Display for KanbanStatus {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum TaskField {
     Title,
     Description,
@@ -205,10 +205,22 @@ impl App {
                 self.current_screen = CurrentScreen::Main;
             }
             KeyCode::Tab => {
-                // TODO: Go to the next field
+                self.currently_editing_task.as_mut().unwrap().currently_editing =
+                    match self.currently_editing_task.as_ref().unwrap().currently_editing {
+                        Some(TaskField::Title) => Some(TaskField::Description),
+                        Some(TaskField::Description) => Some(TaskField::Due),
+                        Some(TaskField::Due) => Some(TaskField::Title),
+                        None => Some(TaskField::Title),
+                    };
             }
             KeyCode::BackTab => {
-                // TODO: Go to the previous field
+                self.currently_editing_task.as_mut().unwrap().currently_editing =
+                    match self.currently_editing_task.as_ref().unwrap().currently_editing {
+                        Some(TaskField::Title) => Some(TaskField::Due),
+                        Some(TaskField::Description) => Some(TaskField::Title),
+                        Some(TaskField::Due) => Some(TaskField::Description),
+                        None => Some(TaskField::Title),
+                    };
             }
             _ => {}
         }
@@ -219,6 +231,27 @@ impl App {
             KeyCode::Esc => {
                 self.currently_editing_task.as_mut().unwrap().mode = TaskEditMode::Normal;
             }
+            KeyCode::Backspace => {
+                if let Some(field) = &self.currently_editing_task.as_mut() {
+                    let cur_task_status = self.cur_task.as_ref().unwrap().status.clone();
+                    let cur_task_index = self.cur_task.as_ref().unwrap().index as usize;
+
+                    match field.currently_editing {
+                        Some(TaskField::Title) => {
+                            self.task_list[&cur_task_status][cur_task_index]
+                                .title
+                                .pop();
+                        }
+                        Some(TaskField::Description) => {
+                            self.task_list[&cur_task_status][cur_task_index]
+                                .description
+                                .pop();
+                        }
+                        Some(TaskField::Due) => {}
+                        None => {}
+                    }
+                }
+            } 
             KeyCode::Char(val) => {
                 if let Some(field) = &self.currently_editing_task.as_mut() {
                     let cur_task_status = self.cur_task.as_ref().unwrap().status.clone();
@@ -263,7 +296,7 @@ impl App {
                             self.exit = true;
                         }
                         KeyCode::Char('w') => {
-                            // TODO: Save all
+                            // TODO
                         }
                         KeyCode::Char('h') => {
                             if let Some(cur_task) = &self.cur_task {

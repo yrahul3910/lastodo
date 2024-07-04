@@ -5,13 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Row, Table};
 use ratatui::Frame;
 
-use crate::app::{
-    App,
-    CurrentScreen,
-    TaskEditMode,
-    TaskEditState,
-    TaskField
-};
+use crate::app::{App, CurrentScreen, TaskEditMode, TaskEditState, TaskField};
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -75,12 +69,15 @@ impl App {
                     Style::default()
                 };
 
-                Row::new(vec![task.title.clone()])
-                    .style(style)
+                Row::new(vec![task.title.clone()]).style(style)
             });
 
             let table = Table::new(rows, &constraints)
-                .block(Block::default().borders(Borders::ALL).title(status.to_string()))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(status.to_string()),
+                )
                 .widths([
                     Constraint::Percentage(40),
                     Constraint::Percentage(40),
@@ -121,7 +118,7 @@ impl App {
                     Span::styled("(s)ave", Style::default().fg(Color::White)),
                     Span::styled(" | ", Style::default().fg(Color::White)),
                     Span::styled("(c)ancel", Style::default().fg(Color::White)),
-                ]
+                ],
             }
         };
         let key_hints_footer =
@@ -136,58 +133,72 @@ impl App {
         frame.render_widget(key_hints_footer, footer_chunks[1]);
 
         if self.current_screen == CurrentScreen::Editing {
-            let title = if self.currently_editing_task.is_some() {
-                "Editing Task"
-            } else {
-                "New task"
-            };
-
-            let editing_block = Block::default()
-                .title(title)
-                .borders(Borders::ALL)
-                .style(Style::default().bg(Color::Gray));
-
-            let area = centered_rect(60, 25, frame.size());
-
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(1)
-                .constraints([
-                    Constraint::Length(3),
-                    Constraint::Percentage(50),
-                    Constraint::Length(3),
-                ])
-                .split(area);
-
-            let title_block = Block::default().title("Title").borders(Borders::ALL).style(active_style);
-            let desc_block = Block::default().title("Description").borders(Borders::ALL);
-            let due_block = Block::default().title("Due").borders(Borders::ALL);
+            let area = centered_rect(60, 50, frame.size());
+            let gray_background = Style::default().bg(Color::Black);
+            frame.render_widget(Block::default().style(gray_background), area);
 
             let new_state = TaskEditState {
                 currently_editing: Some(TaskField::Title),
                 cur_value: String::new(),
                 is_new_task: true,
                 has_changed: true,
-                mode: TaskEditMode::Normal
+                mode: TaskEditMode::Normal,
             };
             let state = self.currently_editing_task.as_ref().unwrap_or(&new_state);
+            self.currently_editing_task = Some(state.clone());
+
+            let currently_editing_field: TaskField = self
+                .currently_editing_task
+                .as_ref()
+                .unwrap()
+                .currently_editing
+                .clone()
+                .unwrap();
+
+            let area = centered_rect(60, 50, frame.size());
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(1)
+                .constraints([
+                    Constraint::Length(3),
+                    Constraint::Percentage(80),
+                    Constraint::Length(3),
+                ])
+                .split(area);
+
+            let title_block = Block::default().title("Title").borders(Borders::ALL).style(
+                if currently_editing_field == TaskField::Title {
+                    active_style
+                } else {
+                    Style::default()
+                },
+            );
+            let desc_block = Block::default()
+                .title("Description")
+                .borders(Borders::ALL)
+                .style(if currently_editing_field == TaskField::Description {
+                    active_style
+                } else {
+                    Style::default()
+                });
+            let due_block = Block::default().title("Due").borders(Borders::ALL).style(
+                if currently_editing_field == TaskField::Due {
+                    active_style
+                } else {
+                    Style::default()
+                },
+            );
 
             let cur_task = self.get_cur_task().unwrap();
-            let title_text = Paragraph::new(cur_task.title)
-                .block(title_block);
+
+            let title_text = Paragraph::new(cur_task.title).block(title_block);
             frame.render_widget(title_text, chunks[0]);
 
-            let desc_text = Paragraph::new(cur_task.description)
-                .block(desc_block);
+            let desc_text = Paragraph::new(cur_task.description).block(desc_block);
             frame.render_widget(desc_text, chunks[1]);
 
-            let due_text = Paragraph::new(cur_task.due.to_string())
-                .block(due_block);
+            let due_text = Paragraph::new(cur_task.due.to_string()).block(due_block);
             frame.render_widget(due_text, chunks[2]);
-
-            frame.render_widget(editing_block, area);
-
-            self.currently_editing_task = Some(state.clone());
         }
     }
 }
