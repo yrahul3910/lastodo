@@ -1,0 +1,17 @@
+[package]
+name = "lastodo-main"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Rahul Yedida <rahul@ryedida.me>"]
+
+[dependencies]
+chrono = "0.4.38"
+color-eyre = "0.6.3"
+crossterm = "0.27.0"
+indexmap = "2.2.6"
+ratatui = { version = "0.26.2", features = ["all-widgets"] }
+
+[[bin]]
+name = "lastodo"
+path = "src/main.rs"

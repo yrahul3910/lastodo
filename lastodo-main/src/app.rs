@@ -6,6 +6,7 @@ use crossterm::event;
 use crossterm::event::{KeyCode, KeyEventKind};
 use indexmap::IndexMap;
 
+use crate::actions;
 use crate::tui::Tui;
 use std::cmp;
 
@@ -160,67 +161,25 @@ impl App {
         Ok(())
     }
 
-    pub fn save_task(&mut self) -> std::result::Result<(), String> {
-        if self.cur_task.is_none() {
-            return Err(String::from("No task was selected."));
-        }
-
-        let status = &self.cur_task.as_ref().unwrap().status;
-
-        if self.currently_editing_task.is_none() {
-            return Err(String::from("No task is currently being edited."));
-        }
-
-        let cur_task = self.get_cur_task().unwrap();
-        let task_list = self.task_list.entry(status.clone()).or_default();
-        let index = task_list.iter().position(|task| *task == cur_task).unwrap();
-
-        task_list[index] = cur_task;
-
-        Ok(())
-    }
-
     fn handle_normal_mode(&mut self, key_code: KeyCode) {
         match key_code {
             KeyCode::Char('i') => {
                 self.currently_editing_task.as_mut().unwrap().mode = TaskEditMode::Insert;
             }
             KeyCode::Char('w') => {
-                let _ = self.save_task();
+                actions::save_task::save_task(self);
             }
             KeyCode::Char('q') => {
-                if let Some(cur_task) = &self.currently_editing_task {
-                    if cur_task.has_changed {
-                        self.message =
-                            "You have unsaved changes. Use 'w' to save or 'x' to discard."
-                                .to_string();
-                    } else {
-                        self.current_screen = CurrentScreen::Main;
-                    }
-                } else {
-                    self.current_screen = CurrentScreen::Main;
-                }
+                actions::quit_editing::quit_editing(self);
             }
             KeyCode::Char('x') => {
-                self.current_screen = CurrentScreen::Main;
+                actions::force_quit_editing::force_quit_editing(self);
             }
             KeyCode::Tab => {
-                self.currently_editing_task.as_mut().unwrap().currently_editing =
-                    match self.currently_editing_task.as_ref().unwrap().currently_editing {
-                        Some(TaskField::Title) => Some(TaskField::Description),
-                        Some(TaskField::Description) => Some(TaskField::Due),
-                        Some(TaskField::Due) => Some(TaskField::Title),
-                        None => Some(TaskField::Title),
-                    };
+                actions::next_field::next_field(self);
             }
             KeyCode::BackTab => {
-                self.currently_editing_task.as_mut().unwrap().currently_editing =
-                    match self.currently_editing_task.as_ref().unwrap().currently_editing {
-                        Some(TaskField::Title) => Some(TaskField::Due),
-                        Some(TaskField::Description) => Some(TaskField::Title),
-                        Some(TaskField::Due) => Some(TaskField::Description),
-                        None => Some(TaskField::Title),
-                    };
+                actions::prev_field::prev_field(self);
             }
             _ => {}
         }
@@ -238,9 +197,7 @@ impl App {
 
                     match field.currently_editing {
                         Some(TaskField::Title) => {
-                            self.task_list[&cur_task_status][cur_task_index]
-                                .title
-                                .pop();
+                            self.task_list[&cur_task_status][cur_task_index].title.pop();
                         }
                         Some(TaskField::Description) => {
                             self.task_list[&cur_task_status][cur_task_index]
@@ -251,7 +208,7 @@ impl App {
                         None => {}
                     }
                 }
-            } 
+            }
             KeyCode::Char(val) => {
                 if let Some(field) = &self.currently_editing_task.as_mut() {
                     let cur_task_status = self.cur_task.as_ref().unwrap().status.clone();
@@ -281,7 +238,7 @@ impl App {
         }
     }
 
-   fn handle_events(&mut self) -> std::io::Result<()> {
+    fn handle_events(&mut self) -> std::io::Result<()> {
         match event::read()? {
             event::Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 match self.current_screen {

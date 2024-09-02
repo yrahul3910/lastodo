@@ -1,11 +1,11 @@
-mod ui;
+mod actions;
+mod app;
 mod errors;
 mod tui;
-mod app;
-mod tests;
+mod ui;
 
-use std::error::Error;
 use app::App;
+use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let _ = errors::install_hooks();
